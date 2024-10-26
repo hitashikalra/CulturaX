@@ -1,0 +1,12 @@
+# Python
+*.pyc
+__pycache__/
+
+# Environment
+.env
+.venv/
+*.sqlite3
+
+# AWS credentials and config files
+*.pem
+config.py
