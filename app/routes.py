@@ -68,3 +68,33 @@ def list_tickets(event_id):
         {'ticket_id': ticket.id, 'user_id': ticket.user_id, 'status': ticket.status}
         for ticket in tickets
     ])
+
+# Update an event
+@app.route('/api/events/<int:event_id>', methods=['PUT'])
+def update_event(event_id):
+    data = request.json
+    if not validate_event_data(data):
+        return jsonify({'error': 'Invalid data'}), 400
+
+    event = Event.query.get(event_id)
+    if not event:
+        return jsonify({'error': 'Event not found'}), 404
+
+    event.name = data['name']
+    event.date = datetime.strptime(data['date'], '%Y-%m-%d')
+    event.location = data['location']
+    db.session.commit()
+
+    return jsonify({'message': 'Event updated successfully'})
+
+# Delete an event
+@app.route('/api/events/<int:event_id>', methods=['DELETE'])
+def delete_event(event_id):
+    event = Event.query.get(event_id)
+    if not event:
+        return jsonify({'error': 'Event not found'}), 404
+
+    db.session.delete(event)
+    db.session.commit()
+    return jsonify({'message': 'Event deleted successfully'})
+
