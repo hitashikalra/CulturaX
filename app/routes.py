@@ -2,10 +2,11 @@ from flask import request, jsonify
 from app import db
 from app.models import Event, Ticket
 from datetime import datetime
-from .utils import validate_event_data, validate_ticket_data
-from .errors import handle_bad_request, handle_not_found
+from .auth import token_required, generate_token
+from .utils import validate_event_data, validate_ticket_data, handle_bad_request, handle_not_found
 from flask import current_app as app
 
+# Error handlers
 @app.errorhandler(400)
 def bad_request(e):
     return handle_bad_request(e)
@@ -14,9 +15,20 @@ def bad_request(e):
 def not_found(e):
     return handle_not_found(e)
 
-# Route to create an event with validation
+# Route to login and obtain JWT token
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    user_id = data.get('user_id')  # Assuming mock authentication for demonstration
+    if user_id:
+        token = generate_token(user_id)
+        return jsonify({'token': token.decode('UTF-8')})
+    return jsonify({'error': 'Missing user credentials'}), 400
+
+# Route to create an event with token authentication and validation
 @app.route('/api/events', methods=['POST'])
-def create_event():
+@token_required
+def create_event(current_user):
     data = request.json
     if not validate_event_data(data):
         return jsonify({'error': 'Invalid event data'}), 400
@@ -30,9 +42,10 @@ def create_event():
     db.session.commit()
     return jsonify({'message': 'Event created successfully', 'event_id': event.id}), 201
 
-# Route to list all events with optional filters
+# Route to list all events, accessible only to authenticated users
 @app.route('/api/events', methods=['GET'])
-def list_events():
+@token_required
+def list_events(current_user):
     events = Event.query.all()
     return jsonify([
         {
@@ -44,9 +57,10 @@ def list_events():
         for event in events
     ])
 
-# Route to register for an event with validation
+# Route to register for an event with token authentication and validation
 @app.route('/api/registrations', methods=['POST'])
-def register_for_event():
+@token_required
+def register_for_event(current_user):
     data = request.json
     if not validate_ticket_data(data):
         return jsonify({'error': 'Invalid registration data'}), 400
@@ -60,18 +74,20 @@ def register_for_event():
     db.session.commit()
     return jsonify({'message': 'Registration successful', 'ticket_id': ticket.id}), 201
 
-# Route to view tickets for an event
+# Route to view tickets for a specific event
 @app.route('/api/events/<int:event_id>/tickets', methods=['GET'])
-def list_tickets(event_id):
+@token_required
+def list_tickets(current_user, event_id):
     tickets = Ticket.query.filter_by(event_id=event_id).all()
     return jsonify([
         {'ticket_id': ticket.id, 'user_id': ticket.user_id, 'status': ticket.status}
         for ticket in tickets
     ])
 
-# Update an event
+# Route to update an existing event with token authentication
 @app.route('/api/events/<int:event_id>', methods=['PUT'])
-def update_event(event_id):
+@token_required
+def update_event(current_user, event_id):
     data = request.json
     if not validate_event_data(data):
         return jsonify({'error': 'Invalid data'}), 400
@@ -87,9 +103,10 @@ def update_event(event_id):
 
     return jsonify({'message': 'Event updated successfully'})
 
-# Delete an event
+# Route to delete an event with token authentication
 @app.route('/api/events/<int:event_id>', methods=['DELETE'])
-def delete_event(event_id):
+@token_required
+def delete_event(current_user, event_id):
     event = Event.query.get(event_id)
     if not event:
         return jsonify({'error': 'Event not found'}), 404
@@ -97,4 +114,3 @@ def delete_event(event_id):
     db.session.delete(event)
     db.session.commit()
     return jsonify({'message': 'Event deleted successfully'})
-
